@@ -1,0 +1,12 @@
+{
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_dim": 384,
+  "chunk_size": 800,
+  "chunk_overlap": 120,
+  "num_documents": 36,
+  "num_chunks": 91,
+  "elapsed_seconds": 0.8,
+  "built_at": "2026-06-17T06:58:07.881550+00:00",
+  "knowledge_base": "knowledge_base",
+  "index_path": "index"
+}
