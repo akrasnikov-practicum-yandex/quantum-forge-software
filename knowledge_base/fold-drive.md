@@ -1,10 +1,10 @@
 ---
-title: fold-drive
+title: Fold-drive
 category: technology
 lang: en
 ---
 
-# fold-drive
+# Fold-drive
 
 A fold-drive is a propulsion system that allows starships to travel faster than light by entering fold-space, an alternate dimension that connects distant points across the Expanse. Without this technology, interstellar travel would take generations; with it, journeys between star systems can be completed in hours or days. The fold-drive is therefore considered one of the foundational technologies of astral civilization.
 

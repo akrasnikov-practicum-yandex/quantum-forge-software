@@ -55,10 +55,13 @@ def make_replacer(terms: dict[str, str]):
     def repl(match: re.Match[str]) -> str:
         original = match.group(0)
         replacement = lookup[original.lower()]
-        # сохраняем регистр: нижний оригинал -> нижний replacement
-        if original.islower():
-            return replacement.lower()
-        return replacement
+        # согласуем регистр ПЕРВОГО символа с оригиналом, сохраняя внутренний
+        # регистр канонического значения (имена собственные остаются с заглавной):
+        # "The Force" -> "The Synth Flux", "the Force" -> "the Synth Flux",
+        # "Kyber" -> "Reson", "clones" -> "vat-born".
+        if original[:1].isupper():
+            return replacement[:1].upper() + replacement[1:]
+        return replacement[:1].lower() + replacement[1:]
 
     return repl
 
