@@ -2,10 +2,15 @@
 """
 build_index.py — построение FAISS-индекса по анонимизированной базе знаний.
 
-Вход:  knowledge_base/*.md  — документы с YAML-frontmatter (title, category, lang)
-Выход: index/index.faiss    — бинарный FAISS-индекс
-       index/index.pkl      — сериализованные метаданные (LangChain FAISS-формат)
-       index/build_report.json — статистика прогона
+Вход:  knowledge_base/*.md       — документы с YAML-frontmatter (title, category, lang)
+       --extra-dir DIR (опц.)    — доп. каталог с документами (напр. data/malicious/)
+Выход: index/index.faiss         — бинарный FAISS-индекс        (или --out DIR)
+       index/index.pkl           — сериализованные метаданные
+       index/build_report.json   — статистика прогона
+
+Использование:
+  python scripts/build_index.py                               # стандартный индекс
+  python scripts/build_index.py --extra-dir data/malicious --out index_security
 
 Пайплайн:
   1. Прочитать документы, распарсить frontmatter, отделить тело.
@@ -18,6 +23,7 @@ build_index.py — построение FAISS-индекса по аноними
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -76,6 +82,23 @@ def slugify(text: str) -> str:
 
 
 def main() -> int:
+    # --- CLI-аргументы -------------------------------------------------------
+    parser = argparse.ArgumentParser(description="Построение FAISS-индекса базы знаний")
+    parser.add_argument(
+        "--extra-dir",
+        type=Path,
+        default=None,
+        help="Доп. каталог с .md-документами для включения в индекс (напр. data/malicious)",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=INDEX_DIR,
+        help=f"Каталог для сохранения индекса (default: {INDEX_DIR})",
+    )
+    args = parser.parse_args()
+    out_dir: Path = args.out if args.out.is_absolute() else ROOT / args.out
+
     # Отложенный импорт — пакеты могут отсутствовать при первой проверке кода
     try:
         from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -92,6 +115,10 @@ def main() -> int:
 
     # --- 1. Чтение документов -----------------------------------------------
     md_files = sorted(KB_DIR.glob("*.md"))
+    if args.extra_dir:
+        extra_path = args.extra_dir if args.extra_dir.is_absolute() else ROOT / args.extra_dir
+        md_files = md_files + sorted(extra_path.glob("*.md"))
+        print(f"[INFO] Включаю доп. каталог: {extra_path} ({len(sorted(extra_path.glob('*.md')))} файлов)")
     if not md_files:
         print(f"[ERROR] В {KB_DIR} нет .md-файлов.", file=sys.stderr)
         return 1
@@ -149,9 +176,9 @@ def main() -> int:
     print(f"[INFO] Индекс построен за {elapsed:.2f} с")
 
     # --- 3. Сохранение индекса ----------------------------------------------
-    INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    vectorstore.save_local(str(INDEX_DIR))
-    print(f"[OK] Индекс сохранён: {INDEX_DIR}/index.faiss + {INDEX_DIR}/index.pkl")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    vectorstore.save_local(str(out_dir))
+    print(f"[OK] Индекс сохранён: {out_dir}/index.faiss + {out_dir}/index.pkl")
 
     # --- 4. build_report.json -----------------------------------------------
     report = {
@@ -164,9 +191,9 @@ def main() -> int:
         "elapsed_seconds": round(elapsed, 3),
         "built_at": datetime.now(timezone.utc).isoformat(),
         "knowledge_base": str(KB_DIR.relative_to(ROOT)),
-        "index_path": str(INDEX_DIR.relative_to(ROOT)),
+        "index_path": str(out_dir.relative_to(ROOT) if out_dir.is_relative_to(ROOT) else out_dir),
     }
-    report_path = INDEX_DIR / "build_report.json"
+    report_path = out_dir / "build_report.json"
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[OK] Отчёт сохранён: {report_path}")
     print(

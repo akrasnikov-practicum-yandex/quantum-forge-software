@@ -29,6 +29,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 INDEX_DIR = ROOT / "index"
 
+# Подключаем модуль безопасности (может быть None если импорт недоступен)
+try:
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from security import is_malicious, sanitize, SECURITY_RULES as _SECURITY_RULES
+    _SECURITY_AVAILABLE = True
+except ImportError:
+    _SECURITY_AVAILABLE = False
+    _SECURITY_RULES = ""
+
 # ---------------------------------------------------------------------------
 # Конфигурация
 # ---------------------------------------------------------------------------
@@ -103,15 +112,22 @@ def build_context_block(docs_with_scores: list) -> tuple[str, list[dict]]:
     return "\n\n".join(context_lines), sources
 
 
-def compose_prompt(query: str, context_block: str) -> list[dict]:
-    """Собрать список сообщений (OpenAI/Ollama chat format)."""
+def compose_prompt(query: str, context_block: str, defense: bool = True) -> list[dict]:
+    """Собрать список сообщений (OpenAI/Ollama chat format).
+
+    При defense=True добавляет SECURITY_RULES в system-промпт (слой 1: pre-prompt).
+    """
+    system = SYSTEM_PROMPT
+    if defense and _SECURITY_AVAILABLE:
+        system = SYSTEM_PROMPT + _SECURITY_RULES
+
     user_message = (
         f"{FEW_SHOT_EXAMPLES}\n"
         f"--- Context ---\n{context_block}\n--- End context ---\n\n"
         f"Q: {query}\nA:"
     )
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": user_message},
     ]
 
@@ -139,8 +155,12 @@ def print_answer(query: str, answer: str, sources: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def ask(query: str, vectorstore, llm) -> None:
-    """Выполнить один RAG-запрос: retrieve → guard → prompt → generate → print."""
+def ask(query: str, vectorstore, llm, defense: bool = True) -> None:
+    """Выполнить один RAG-запрос: retrieve → guard → (defense) → prompt → generate → print.
+
+    defense=True (default): применять все 3 слоя защиты от prompt injection.
+    defense=False: режим INSECURE для демонстрации уязвимости.
+    """
 
     # Шаг 2: Поиск
     results = vectorstore.similarity_search_with_score(query, k=TOP_K)
@@ -154,9 +174,31 @@ def ask(query: str, vectorstore, llm) -> None:
         )
         return
 
+    # Слой 2: Post-check — отбросить вредоносные чанки (только при defense=True)
+    if defense and _SECURITY_AVAILABLE:
+        clean_results = [(doc, sc) for doc, sc in results if not is_malicious(doc.page_content)]
+        filtered_count = len(results) - len(clean_results)
+        if filtered_count:
+            print(f"  [SECURITY] Отфильтровано вредоносных чанков: {filtered_count}")
+        results = clean_results
+        if not results:
+            print_separator(f"Q: {query}")
+            print(
+                "\n[SECURITY] All retrieved chunks were filtered as potentially malicious.\n"
+                "I don't know — no safe context available to answer this question.\n"
+            )
+            return
+
+        # Слой 3: Sanitize — вырезать управляющие конструкции из оставшихся чанков
+        sanitized_results = []
+        for doc, sc in results:
+            doc.page_content = sanitize(doc.page_content)
+            sanitized_results.append((doc, sc))
+        results = sanitized_results
+
     # Шаг 4: Формирование промпта
     context_block, sources = build_context_block(results)
-    messages = compose_prompt(query, context_block)
+    messages = compose_prompt(query, context_block, defense=defense)
 
     # Шаг 5: Вызов LLM
     from langchain_core.messages import HumanMessage, SystemMessage
@@ -199,6 +241,23 @@ DEMO_QUERIES_OUT_OF_DOMAIN = [
 
 
 def main() -> int:
+    import argparse as _argparse
+    parser = _argparse.ArgumentParser(description="RAG-бот Astral Strife")
+    parser.add_argument("--demo", action="store_true", help="Прогон встроенных демо-запросов")
+    parser.add_argument(
+        "--no-defense", action="store_true",
+        help="Отключить защиту от prompt injection (INSECURE — только для демонстрации)"
+    )
+    parser.add_argument(
+        "--index", type=Path, default=None,
+        help="Путь к каталогу FAISS-индекса (default: index/)"
+    )
+    args = parser.parse_args()
+
+    defense = not args.no_defense
+    index_path = (ROOT / args.index if args.index and not Path(args.index).is_absolute()
+                  else Path(args.index) if args.index else INDEX_DIR)
+
     try:
         from langchain_huggingface import HuggingFaceEmbeddings
         from langchain_community.vectorstores import FAISS
@@ -212,9 +271,9 @@ def main() -> int:
         return 1
 
     # Проверка индекса
-    if not (INDEX_DIR / "index.faiss").exists():
+    if not (index_path / "index.faiss").exists():
         print(
-            f"[ERROR] Index not found: {INDEX_DIR}/index.faiss\n"
+            f"[ERROR] Index not found: {index_path}/index.faiss\n"
             "Run: python scripts/build_index.py",
             file=sys.stderr,
         )
@@ -228,9 +287,9 @@ def main() -> int:
         encode_kwargs={"normalize_embeddings": True},
     )
 
-    print(f"[INFO] Loading FAISS index: {INDEX_DIR}")
+    print(f"[INFO] Loading FAISS index: {index_path}")
     vectorstore = FAISS.load_local(
-        str(INDEX_DIR),
+        str(index_path),
         embeddings,
         allow_dangerous_deserialization=True,
     )
@@ -243,25 +302,25 @@ def main() -> int:
         temperature=0,
     )
 
-    demo_mode = "--demo" in sys.argv
+    defense_label = "SECURE (defense ON)" if defense else "⚠️  INSECURE (defense OFF)"
 
-    if demo_mode:
+    if args.demo:
         # --- Демо-режим: прогон фиксированных запросов ---
         print("\n" + "═" * 64)
         print("  DEMO MODE — Astral Strife Knowledge Base RAG Bot")
         print("═" * 64)
         print(f"  Model: {OLLAMA_MODEL} | Threshold: {RELEVANCE_THRESHOLD}")
-        print(f"  In-domain queries: {len(DEMO_QUERIES_IN_DOMAIN)}")
-        print(f"  Out-of-domain queries: {len(DEMO_QUERIES_OUT_OF_DOMAIN)}")
+        print(f"  Mode: {defense_label}")
+        print(f"  Index: {index_path}")
         print("═" * 64 + "\n")
 
         print("── IN-DOMAIN QUERIES (bot should answer) ──\n")
         for q in DEMO_QUERIES_IN_DOMAIN:
-            ask(q, vectorstore, llm)
+            ask(q, vectorstore, llm, defense=defense)
 
         print("\n── OUT-OF-DOMAIN QUERIES (bot should say 'I don't know') ──\n")
         for q in DEMO_QUERIES_OUT_OF_DOMAIN:
-            ask(q, vectorstore, llm)
+            ask(q, vectorstore, llm, defense=defense)
 
         print("[OK] Demo complete.")
         return 0
@@ -269,7 +328,8 @@ def main() -> int:
     # --- REPL ---
     print("\n" + "═" * 64)
     print("  Astral Strife Knowledge Base RAG Bot")
-    print(f"  Model: {OLLAMA_MODEL} | Type /exit to quit | /help for hints")
+    print(f"  Model: {OLLAMA_MODEL} | {defense_label}")
+    print(f"  Type /exit to quit | /help for hints")
     print("═" * 64 + "\n")
 
     while True:
@@ -289,7 +349,7 @@ def main() -> int:
             print("Commands: /exit — quit, /help — this message\n")
             continue
 
-        ask(query, vectorstore, llm)
+        ask(query, vectorstore, llm, defense=defense)
 
     return 0
 
