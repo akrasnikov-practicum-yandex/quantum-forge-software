@@ -78,8 +78,8 @@ def slugify(text: str) -> str:
 def main() -> int:
     # Отложенный импорт — пакеты могут отсутствовать при первой проверке кода
     try:
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-        from langchain.schema import Document
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        from langchain_core.documents import Document
         from langchain_huggingface import HuggingFaceEmbeddings
         from langchain_community.vectorstores import FAISS
     except ImportError as exc:
