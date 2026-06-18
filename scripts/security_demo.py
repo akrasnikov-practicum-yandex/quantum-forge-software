@@ -17,6 +17,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# На Windows-консоли (cp1251) emoji/box-символы в print иначе падают с UnicodeEncodeError.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parent.parent
 SECURITY_INDEX = ROOT / "index_security"
 
@@ -121,7 +127,9 @@ def main() -> int:
         for line in malicious_in_context:
             print(line)
 
-        if results and results[0][1] < RELEVANCE_THRESHOLD:
+        # INSECURE = НИКАКОЙ фильтрации: ни relevance-guard, ни слоёв защиты.
+        # Malicious-чанк подаётся в LLM как есть — так демонстрируется реальная утечка.
+        if results:
             context_block, _ = build_context_block(results)
             messages = compose_prompt(query, context_block, defense=False)
             from langchain_core.messages import HumanMessage, SystemMessage
@@ -129,9 +137,9 @@ def main() -> int:
                   else HumanMessage(content=m["content"]) for m in messages]
             resp = llm.invoke(lc)
             answer = resp.content if hasattr(resp, "content") else str(resp)
-            print(f"\n  Bot answer (INSECURE):\n  {answer.strip()[:400]}")
+            print(f"\n  Bot answer (INSECURE — guard OFF, defense OFF):\n  {answer.strip()[:400]}")
         else:
-            print("\n  Bot answer (INSECURE): «I don't know» (score threshold)")
+            print("\n  Bot answer (INSECURE): нет результатов поиска")
 
         # --- A2: SECURE (все три слоя включены) ---
         print("\n[A2] ✅  SECURE MODE (защита включена):")
