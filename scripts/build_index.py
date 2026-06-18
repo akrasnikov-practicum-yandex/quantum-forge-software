@@ -14,10 +14,10 @@ build_index.py — построение FAISS-индекса по аноними
 
 Пайплайн:
   1. Прочитать документы, распарсить frontmatter, отделить тело.
-  2. Нарезать текст на чанки: RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=120).
+  2. Нарезать текст на чанки: RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200).
   3. Добавить метаданные на каждый чанк: source, title, category, lang, chunk_index, chunk_id.
   4. Сгенерировать эмбеддинги: sentence-transformers/all-MiniLM-L6-v2 (dim=384).
-  5. Построить индекс FAISS.IndexFlatIP и сохранить через LangChain FAISS.save_local().
+  5. Построить FAISS-индекс (L2 на нормализованных векторах ≈ cosine) через FAISS.save_local().
   6. Вывести статистику, записать build_report.json.
 """
 
@@ -31,13 +31,21 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# На Windows-консоли (cp1251) emoji/box-символы в print иначе падают с UnicodeEncodeError.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parent.parent
 KB_DIR = ROOT / "knowledge_base"
 INDEX_DIR = ROOT / "index"
 
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-CHUNK_SIZE = 800      # символов; ~200 слов, укладывается в лимит 300 слов из ТЗ
-CHUNK_OVERLAP = 120   # ~15% overlap — сохранение контекста на границах чанков
+# Размер чанка в СИМВОЛАХ (length_function=len). На корпусе ≈6.4 симв/слово
+# 1500 символов ≈ 230 слов — попадает в требуемый ТЗ диапазон 100–300 слов.
+CHUNK_SIZE = 1500
+CHUNK_OVERLAP = 200   # ~13% overlap — сохранение контекста на границах чанков
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +146,12 @@ def main() -> int:
         title = meta.get("title", md_path.stem)
         category = meta.get("category", "unknown")
         lang = meta.get("lang", "en")
-        source_rel = f"knowledge_base/{md_path.name}"
+        # Реальный путь относительно корня репо (knowledge_base/… или data/malicious/…),
+        # чтобы провенанс чанка не подменялся на knowledge_base/ для --extra-dir файлов.
+        try:
+            source_rel = md_path.resolve().relative_to(ROOT).as_posix()
+        except ValueError:
+            source_rel = md_path.name
         slug = slugify(title)
 
         # Нарезка на чанки
@@ -166,7 +179,7 @@ def main() -> int:
     embeddings = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
         model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},  # cosine similarity через inner product
+        encode_kwargs={"normalize_embeddings": True},  # нормализация → L2-ранжирование ≈ cosine
     )
 
     print("[INFO] Генерирую эмбеддинги и строю FAISS-индекс…")
@@ -183,7 +196,7 @@ def main() -> int:
     # --- 4. build_report.json -----------------------------------------------
     report = {
         "model": EMBEDDING_MODEL,
-        "embedding_dim": 384,
+        "embedding_dim": int(vectorstore.index.d),  # из реального индекса, не хардкод
         "chunk_size": CHUNK_SIZE,
         "chunk_overlap": CHUNK_OVERLAP,
         "num_documents": len(md_files),
@@ -191,6 +204,7 @@ def main() -> int:
         "elapsed_seconds": round(elapsed, 3),
         "built_at": datetime.now(timezone.utc).isoformat(),
         "knowledge_base": str(KB_DIR.relative_to(ROOT)),
+        "extra_dir": (str(args.extra_dir) if args.extra_dir else None),
         "index_path": str(out_dir.relative_to(ROOT) if out_dir.is_relative_to(ROOT) else out_dir),
     }
     report_path = out_dir / "build_report.json"

@@ -14,6 +14,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# На Windows-консоли (cp1251) emoji/box-символы в print иначе падают с UnicodeEncodeError.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parent.parent
 INDEX_DIR = ROOT / "index"
 
@@ -68,6 +74,16 @@ def show_results(query: str, results: list) -> None:
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="Поиск по FAISS-индексу Astral Strife")
+    parser.add_argument("query", nargs="*", help="Поисковый запрос (если пусто — демо-запросы)")
+    parser.add_argument(
+        "--index", type=Path, default=INDEX_DIR,
+        help=f"Каталог FAISS-индекса (default: {INDEX_DIR}); напр. index_security",
+    )
+    args = parser.parse_args()
+    index_path = args.index if args.index.is_absolute() else ROOT / args.index
+
     try:
         from langchain_huggingface import HuggingFaceEmbeddings
         from langchain_community.vectorstores import FAISS
@@ -80,9 +96,9 @@ def main() -> int:
         return 1
 
     # Проверка наличия индекса
-    if not (INDEX_DIR / "index.faiss").exists():
+    if not (index_path / "index.faiss").exists():
         print(
-            f"[ERROR] Индекс не найден: {INDEX_DIR}/index.faiss\n"
+            f"[ERROR] Индекс не найден: {index_path}/index.faiss\n"
             "Сначала запустите: python scripts/build_index.py",
             file=sys.stderr,
         )
@@ -96,18 +112,17 @@ def main() -> int:
         encode_kwargs={"normalize_embeddings": True},
     )
 
-    print(f"[INFO] Загружаю индекс: {INDEX_DIR}")
+    print(f"[INFO] Загружаю индекс: {index_path}")
     vectorstore = FAISS.load_local(
-        str(INDEX_DIR),
+        str(index_path),
         embeddings,
         allow_dangerous_deserialization=True,
     )
     print("[OK] Индекс загружен. Начинаю поиск.\n")
 
     # Определяем список запросов: из CLI или демо
-    queries: list[str] = []
-    if len(sys.argv) > 1:
-        queries = [" ".join(sys.argv[1:])]
+    if args.query:
+        queries = [" ".join(args.query)]
     else:
         print("Режим: встроенные демо-запросы")
         queries = DEMO_QUERIES
