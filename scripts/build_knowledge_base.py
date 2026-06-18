@@ -28,10 +28,31 @@ import sys
 import unicodedata
 from pathlib import Path
 
+# На Windows-консоли (cp1251) emoji/box-символы в print иначе падают с UnicodeEncodeError.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT / "data" / "source_sw"
 OUT_DIR = ROOT / "knowledge_base"
 TERMS_PATH = ROOT / "terms_map.json"
+
+# Независимый от словаря deny-list ХАРАКТЕРНЫХ (неоднозначно-английских лучше избегать)
+# терминов Star Wars, включая формы мн. числа и слова, которых может не быть в terms_map.
+# Это ВТОРАЯ самопроверка: ловит утечки, невидимые для словарной (которая знает только
+# свои ключи). Сюда НЕ включены generic-английские слова (force/empire/republic/clone/…),
+# чтобы не падать на легитимной прозе — их покрывает словарная проверка.
+SW_DENYLIST = re.compile(
+    r"\b(?:jedi|sith|lightsabers?|skywalker|darth|vader|kenobi|obi-?wan|yoda|padawans?|"
+    r"kyber|hyperdrives?|hyperspace|hyperlanes?|lightspeed|wookiees?|jawas?|ewoks?|"
+    r"tusken|mandalor\w*|ahsoka|tano|palpatine|sidious|chewbacca|chewie|boba|jango|jabba|"
+    r"tatooine|coruscant|dagobah|mustafar|alderaan|kashyyyk|kamino|naboo|endor|hoth|"
+    r"death\s+star|x-wing|tie\s+fighters?|millennium\s+falcon|carbonite|stormtroopers?|"
+    r"younglings?|astromech|star\s+wars)\b",
+    re.IGNORECASE,
+)
 
 
 def load_terms() -> dict[str, str]:
@@ -154,20 +175,30 @@ def main() -> int:
 
     print(f"[OK] записано {written} документов в {OUT_DIR}")
 
-    # --- самопроверка: остаточные оригинальные термины ---
+    # --- самопроверка №1: остаточные термины ИЗ СЛОВАРЯ ---
     leftovers: list[str] = []
+    # --- самопроверка №2: независимый deny-list (ловит мн.число и неучтённые SW-слова) ---
+    denylist_hits: list[str] = []
     for out in sorted(OUT_DIR.glob("*.md")):
         text = out.read_text(encoding="utf-8")
         for m in pattern.finditer(text):
             leftovers.append(f"{out.name}: '{m.group(0)}'")
+        for m in SW_DENYLIST.finditer(text):
+            denylist_hits.append(f"{out.name}: '{m.group(0)}'")
 
-    if leftovers:
-        print(f"[FAIL] найдено {len(leftovers)} остаточных оригинальных терминов:", file=sys.stderr)
-        for item in leftovers[:50]:
-            print("   ", item, file=sys.stderr)
+    if leftovers or denylist_hits:
+        if leftovers:
+            print(f"[FAIL] остаточные термины из словаря: {len(leftovers)}", file=sys.stderr)
+            for item in leftovers[:50]:
+                print("   ", item, file=sys.stderr)
+        if denylist_hits:
+            print(f"[FAIL] deny-list поймал SW-термины (не покрыты словарём): {len(denylist_hits)}",
+                  file=sys.stderr)
+            for item in denylist_hits[:50]:
+                print("   ", item, file=sys.stderr)
         return 2
 
-    print(f"[OK] остаточных оригинальных терминов: 0 (словарь покрывает корпус, {len(terms)} записей)")
+    print(f"[OK] остаточных терминов: 0 (словарь {len(terms)} записей + независимый deny-list)")
     return 0
 
 
