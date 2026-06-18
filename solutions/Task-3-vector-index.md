@@ -17,7 +17,8 @@
 Модель выбрана в Задании 1: компактная (~22 МБ), быстрая (CPU-inference), хорошее качество на
 английском, данные не покидают инфраструктуру. Корпус базы знаний — английский, поэтому
 `all-MiniLM-L6-v2` оптимальна. Эмбеддинги нормализованы (`normalize_embeddings=True`),
-что позволяет использовать `IndexFlatIP` (inner product) как косинусное сходство.
+поэтому L2-расстояние индекса монотонно эквивалентно косинусному сходству
+(меньший score = ближе).
 
 ---
 
@@ -41,12 +42,13 @@
 | Параметр | Значение | Обоснование |
 |---|---|---|
 | **Splitter** | `RecursiveCharacterTextSplitter` | Рекурсивное разбиение по `\n\n → \n → пробел` сохраняет логические границы |
-| **`chunk_size`** | 800 символов | ≈200 слов — укладывается в лимит 100–300 слов из ТЗ |
-| **`chunk_overlap`** | 120 символов | ~15% — сохраняет контекст на границах чанков (рекомендация из курса: 10–20%) |
+| **`chunk_size`** | 1500 символов | ≈230 слов (при ~6.4 симв/слово) — в диапазоне 100–300 слов из ТЗ |
+| **`chunk_overlap`** | 200 символов | ~13% — сохраняет контекст на границах чанков (курс: 10–20%) |
 
-Документы «Astral Strife» сравнительно короткие (400–1 500 символов), поэтому большинство
-статей даёт 1–3 чанка. Overlap предотвращает потерю смысла на границе: если ответ начинается
-в конце одного чанка, он «виден» и в начале следующего.
+Документы «Astral Strife» — короткие энциклопедические статьи (171–215 слов каждая), поэтому
+при `chunk_size=1500` каждая статья укладывается в один связный чанк (36 документов → 36 чанков),
+и **все чанки попадают в требуемый диапазон 100–300 слов**. Overlap предотвращает потерю смысла
+на границе, если статья окажется длиннее и будет разбита на несколько чанков.
 
 ### Метаданные чанка
 
@@ -68,12 +70,12 @@
 | Параметр | Значение |
 |---|---|
 | **Документов** | 36 |
-| **Чанков в индексе** | 91 |
+| **Чанков в индексе** | 36 (каждый 171–215 слов) |
 | **Размерность векторов** | 384 |
-| **Время генерации** | **0.80 с** |
-| **Размер `index.faiss`** | 137 KB |
-| **Размер `index.pkl`** | 58 KB |
-| **Окружение** | CPU (x86-64), Python 3.14, faiss-cpu |
+| **Время генерации** | **0.85 с** |
+| **Размер `index.faiss`** | 54 KB |
+| **Размер `index.pkl`** | 50 KB |
+| **Окружение** | CPU (x86-64), Python 3.13, faiss-cpu |
 
 Полный отчёт прогона: [`index/build_report.json`](../index/build_report.json)
 
@@ -81,63 +83,46 @@
 
 ## 5. Пример запросов и найденных чанков
 
-Тест качества — 3 запроса по лору «Astral Strife» (запуск: `python scripts/query_index.py`):
+Тест качества — 3 запроса по лору «Astral Strife» (запуск: `python scripts/query_index.py`).
+Score — L2-расстояние на нормализованных векторах (меньше = ближе, эквивалент косинуса):
 
 ### Запрос 1: Who turned to the Umbral Tide and became a Drakkar Sovereign?
 
 ```
-[1] score=0.6941 | Drakkar (chunk 1) | knowledge_base/drakkar.md
-    For much of their later history, the Drakkar maintained a strict structure of only
-    two members at a time: a master and an apprentice...
-
-[2] score=0.7146 | Drakkar (chunk 0) | knowledge_base/drakkar.md
-    The Drakkar were an ancient order of Synth Flux-wielders who embraced the Umbral Tide
-    and stood as the great rivals of the Veyari...
+[1] score=0.7567 | Drakkar (chunk 0)     | knowledge_base/drakkar.md
+[2] score=0.9837 | Malkor (chunk 0)      | knowledge_base/malkor.md
+[4] score=1.0263 | Xarn Velgor (chunk 0) | knowledge_base/xarn-velgor.md
 ```
 
-**Оценка:** топ-2 релевантны — возвращает статьи про Drakkar (орден, принявший Umbral Tide).
-Ответ на вопрос о конкретном персонаже (Xarn Velgor) нашёлся бы при более конкретном запросе
-«Who is Xarn Velgor?».
+**Оценка:** релевантно — орден Drakkar, его лидер Malkor (Drakh Umbra) и конкретный
+Drakkar Sovereign (Xarn Velgor, обратившийся к Umbral Tide) попадают в топ результатов.
 
 ---
 
 ### Запрос 2: What weapon uses a reson crystal as its power source?
 
 ```
-[1] score=0.5151 | Reson crystal (chunk 0) | knowledge_base/reson-crystal.md
-    A reson crystal is a rare, Synth Flux-attuned mineral that serves as the power source
-    at the heart of an arc-glaive...
-
-[2] score=0.7351 | Reson crystal (chunk 2) | knowledge_base/reson-crystal.md
-    Beyond their use in personal weapons, reson crystals possess immense raw energy when
-    gathered in large quantities. The Helion Dominion harvested vast amounts of reson to
-    power the superlaser of the Void Core...
-
-[4] score=1.0709 | Arc-glaive (chunk 1) | knowledge_base/arc-glaive.md
-    At the heart of every arc-glaive lies a reson crystal, which focuses the energy that
-    forms the blade...
+[1] score=0.5697 | Reson crystal (chunk 0) | knowledge_base/reson-crystal.md
+    A reson crystal … serves as the power source at the heart of an arc-glaive…
+[2] score=1.0418 | Arc-glaive (chunk 0)     | knowledge_base/arc-glaive.md
+    An arc-glaive is an energy weapon … blade of pure plasma…
 ```
 
-**Оценка:** отличная релевантность — первый же чанк содержит прямой ответ. Score < 1.0
-у первых двух результатов означает высокое семантическое сходство (нормализованный IP = cosine).
+**Оценка:** отличная релевантность — первый чанк (reson-crystal, score 0.57) содержит прямой
+ответ; следом arc-glaive. Малый score = высокое сходство (L2 на нормализованных векторах ≈ cosine).
 
 ---
 
 ### Запрос 3: Which faction fought against the Helion Dominion?
 
 ```
-[1] score=0.6597 | Helion Dominion (chunk 0) | knowledge_base/helion-dominion.md
-    The Helion Dominion was an authoritarian regime that ruled much of the Expanse following
-    the collapse of the Aurelian Concord...
-
-[2] score=0.8847 | Drakkar (chunk 2) | knowledge_base/drakkar.md
-    The Drakkar pursued a long campaign to undermine the Veyari Conclave and the Aurelian
-    Concord. Through patience, deception, and political intrigue, they engineered the rise
-    of the Helion Dominion...
+[1] score=0.6697 | Helion Dominion (chunk 0)  | knowledge_base/helion-dominion.md
+[2] score=1.0899 | Vat Wars (chunk 0)         | knowledge_base/vat-wars.md
+[3] score=1.0930 | Aurelian Concord (chunk 0) | knowledge_base/aurelian-concord.md
 ```
 
-**Оценка:** контекстно релевантно. Прямая статья про Ember Coalition появилась бы в
-расширенном топ-K. Для production RAG здесь помогла бы метафильтрация по `category=faction`.
+**Оценка:** контекстно релевантно (Helion Dominion, Vat Wars, Aurelian Concord). Прямая статья
+про Ember Coalition появилась бы в расширенном топ-K или при метафильтрации `category=faction`.
 
 ---
 
@@ -179,18 +164,18 @@ knowledge_base/*.md
 parse_frontmatter()        — извлечение title/category/lang, отделение тела
         │
         ▼
-RecursiveCharacterTextSplitter  — chunk_size=800, overlap=120
-        │  91 чанков с метаданными (source, title, category, lang, chunk_index, chunk_id)
+RecursiveCharacterTextSplitter  — chunk_size=1500, overlap=200
+        │  36 чанков с метаданными (source, title, category, lang, chunk_index, chunk_id)
         ▼
 HuggingFaceEmbeddings          — all-MiniLM-L6-v2, dim=384, normalize=True
         │
         ▼
-FAISS.from_documents()         — IndexFlatIP (cosine через inner product)
+FAISS.from_documents()         — IndexFlatL2 (нормализация → L2 ≈ cosine)
         │
         ▼
 vectorstore.save_local("index/")
-  ├── index/index.faiss   (137 KB)
-  ├── index/index.pkl     (58 KB)
+  ├── index/index.faiss   (54 KB)
+  ├── index/index.pkl     (50 KB)
   └── index/build_report.json
 ```
 
