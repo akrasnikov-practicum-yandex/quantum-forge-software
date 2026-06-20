@@ -47,7 +47,9 @@ _RAW_PATTERNS = [
     r"system\s*:\s*(you|ignore|disregard|forget)",
     r"override\s+(all\s+)?instructions?",
     r"new\s+instructions?\s*:",
-    r"act\s+as\s+(if\s+you\s+are|a)",
+    # «act as ...» только в начале строки (типично для инъекции-директивы),
+    # чтобы не ловить прозу вида «must act as a coordinator».
+    r"(?m)^\s*act\s+as\s+(an?\b|if\s+you\s+are\b)",
     r"do\s+not\s+follow\s+(your\s+)?instructions?",
 ]
 

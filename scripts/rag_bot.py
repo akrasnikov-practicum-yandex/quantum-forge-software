@@ -5,8 +5,9 @@ rag_bot.py — RAG-бот с Few-shot и Chain-of-Thought промптингом
 Пайплайн (явные шаги, без магии RetrievalQA):
   1. Загрузить FAISS-индекс и embedding-модель (all-MiniLM-L6-v2).
   2. Embed запроса → поиск топ-K чанков в FAISS.
-  3. Guard: нет релевантных чанков → ответ «Я не знаю» без вызова LLM.
-  4. Compose prompt: System (роль + CoT) + Few-shot примеры + Context + User.
+  3. (defense) Слой 2: отбросить вредоносные чанки; затем Guard: нет релевантных → «Я не знаю».
+  4. (defense) Слой 3: sanitize оставшихся чанков (на копии). Compose prompt:
+     System (роль + CoT) + Few-shot примеры + Context + User.
   5. Вызов локальной LLM через Ollama (localhost:11434).
   6. Печать ответа + источников.
 
@@ -25,6 +26,12 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+
+# На Windows-консоли (cp1251) emoji/box-символы в print иначе падают с UnicodeEncodeError.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 ROOT = Path(__file__).resolve().parent.parent
 INDEX_DIR = ROOT / "index"
@@ -46,9 +53,11 @@ EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 TOP_K = 4
-# FAISS inner-product на нормализованных векторах: меньший score = ближе.
-# Порог 1.3 откалиброван по данным Task-3: доменные запросы давали score 0.5–1.1,
-# out-of-domain — 1.3+.
+# FAISS строит L2-индекс; на нормализованных векторах L2-расстояние монотонно
+# эквивалентно косинусу (меньший score = ближе, не inner product).
+# Порог — ЭВРИСТИКА: наблюдаемые in-domain score в Task-3 были 0.5–1.1, поэтому 1.3
+# взят как консервативная отсечка. Полноценную калибровку по реальным out-of-domain
+# запросам нужно измерять отдельно (см. solutions/REVIEW-sprint7.md).
 RELEVANCE_THRESHOLD = float(os.getenv("RELEVANCE_THRESHOLD", "1.3"))
 
 # ---------------------------------------------------------------------------
@@ -165,7 +174,16 @@ def ask(query: str, vectorstore, llm, defense: bool = True) -> None:
     # Шаг 2: Поиск
     results = vectorstore.similarity_search_with_score(query, k=TOP_K)
 
-    # Шаг 3: Guard — нет результатов или все нерелевантны
+    # Слой 2 (defense): Post-check — отбросить вредоносные чанки ДО решения о релевантности,
+    # чтобы инъекция не попала в промпт, даже если её score прошёл бы порог.
+    if defense and _SECURITY_AVAILABLE and results:
+        clean_results = [(doc, sc) for doc, sc in results if not is_malicious(doc.page_content)]
+        filtered_count = len(results) - len(clean_results)
+        if filtered_count:
+            print(f"  [SECURITY] Отфильтровано вредоносных чанков: {filtered_count}")
+        results = clean_results
+
+    # Шаг 3: Guard — нет (безопасных) результатов или лучший нерелевантен → «Я не знаю»
     if not results or results[0][1] >= RELEVANCE_THRESHOLD:
         print_separator(f"Q: {query}")
         print(
@@ -174,27 +192,15 @@ def ask(query: str, vectorstore, llm, defense: bool = True) -> None:
         )
         return
 
-    # Слой 2: Post-check — отбросить вредоносные чанки (только при defense=True)
+    # Слой 3 (defense): Sanitize — вырезать управляющие конструкции из ОСТАВШИХСЯ чанков.
+    # Работаем на КОПИИ Document, чтобы НЕ мутировать общий docstore FAISS: объекты
+    # возвращаются по ссылке и переиспользуются между запросами (in-place правка их портит).
     if defense and _SECURITY_AVAILABLE:
-        clean_results = [(doc, sc) for doc, sc in results if not is_malicious(doc.page_content)]
-        filtered_count = len(results) - len(clean_results)
-        if filtered_count:
-            print(f"  [SECURITY] Отфильтровано вредоносных чанков: {filtered_count}")
-        results = clean_results
-        if not results:
-            print_separator(f"Q: {query}")
-            print(
-                "\n[SECURITY] All retrieved chunks were filtered as potentially malicious.\n"
-                "I don't know — no safe context available to answer this question.\n"
-            )
-            return
-
-        # Слой 3: Sanitize — вырезать управляющие конструкции из оставшихся чанков
-        sanitized_results = []
-        for doc, sc in results:
-            doc.page_content = sanitize(doc.page_content)
-            sanitized_results.append((doc, sc))
-        results = sanitized_results
+        from langchain_core.documents import Document
+        results = [
+            (Document(page_content=sanitize(doc.page_content), metadata=dict(doc.metadata)), sc)
+            for doc, sc in results
+        ]
 
     # Шаг 4: Формирование промпта
     context_block, sources = build_context_block(results)

@@ -1,12 +1,13 @@
 {
   "model": "sentence-transformers/all-MiniLM-L6-v2",
   "embedding_dim": 384,
-  "chunk_size": 800,
-  "chunk_overlap": 120,
+  "chunk_size": 1500,
+  "chunk_overlap": 200,
   "num_documents": 37,
-  "num_chunks": 92,
-  "elapsed_seconds": 0.853,
-  "built_at": "2026-06-17T09:59:29.802489+00:00",
+  "num_chunks": 37,
+  "elapsed_seconds": 0.812,
+  "built_at": "2026-06-18T04:58:26.498064+00:00",
   "knowledge_base": "knowledge_base",
+  "extra_dir": "data\\malicious",
   "index_path": "index_security"
 }
