@@ -40,7 +40,7 @@ LLM прототипа фактически реализована **локал�
 ## Задание 4. RAG-бот с few-shot и CoT
 
 [`rag_bot.py`](scripts/rag_bot.py): query → embed (тот же энкодер) → поиск FAISS → промпт
-(System с CoT + 2 few-shot примера, реально извлекаемых из базы) → LLM (Ollama) → ответ.
+(System с CoT + 2 few-shot примера, основанных на реальных фактах базы) → LLM (Ollama) → ответ.
 «Я не знаю» — через порог релевантности (до вызова LLM). Интерфейс — REPL + `--demo`.
 5 успешных диалогов + случаи честного отказа.
 
@@ -53,7 +53,8 @@ LLM прототипа фактически реализована **локал�
 ([`security.py`](scripts/security.py)): pre-prompt, post-проверка (`is_malicious` отбрасывает
 вредоносные чанки ДО релевантного guard'а), sanitize (на копии чанка). Демонстрация INSECURE
 (утечка) vs SECURE (блок) — [`security_demo.py`](scripts/security_demo.py), батарея 10 тестов
-(5 ответов + 5 отказов/фильтр).
+(5 ответов + 5 отказов/фильтр). Реальные захваченные логи прогона —
+[`solutions/logs/`](solutions/logs/).
 
 → [solutions/Task-5-security.md](solutions/Task-5-security.md)
 
@@ -67,6 +68,6 @@ Docker: `docker compose build && docker compose run --rm bot`.
 
 ## Сдача
 
-- Ветка: `rag` (фичи) / финальные правки ревью — `rag-review-fixes`.
-- Перед сдачей: убедиться, что репозиторий **публичный** и открыт **PR `rag` → `main`** в своём
-  репозитории (не в репозитории Практикума). См. [solutions/REVIEW-sprint7.md](solutions/REVIEW-sprint7.md).
+- Решение целиком в ветке `rag` (правки по ревью влиты).
+- Репозиторий **публичный**; открыт **PR `rag` → `develop`** в своём репозитории.
+  Ветка `main` не используется: у неё с `rag` нет общего предка, поэтому PR в `main` не создаётся.

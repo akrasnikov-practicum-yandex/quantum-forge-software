@@ -21,6 +21,7 @@ scripts/
   security.py               детектор и санитайзер prompt-injection
   security_demo.py          демонстрация INSECURE vs SECURE + батарея 10 тестов
 solutions/           отчёты по заданиям 1–5 + REVIEW-sprint7.md
+  logs/              реальные логи прогона Задания 5 (security_demo + rag_bot --demo)
 Project_template.md  сводные ответы по всем заданиям
 ```
 
@@ -62,4 +63,4 @@ docker compose run --rm bot          # прогон демо
 | 4 | RAG-бот (few-shot, CoT) | [solutions/Task-4-rag-bot.md](solutions/Task-4-rag-bot.md) |
 | 5 | Безопасность и демонстрация | [solutions/Task-5-security.md](solutions/Task-5-security.md) |
 
-Сводные ответы — [Project_template.md](Project_template.md). Отчёт ревью — [solutions/REVIEW-sprint7.md](solutions/REVIEW-sprint7.md).
+Сводные ответы — [Project_template.md](Project_template.md).
