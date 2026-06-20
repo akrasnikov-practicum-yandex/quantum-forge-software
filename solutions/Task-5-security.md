@@ -123,8 +123,8 @@ Retrieval по `index_security/` (проверено, воспроизводим
 бот честно отвечает «I don't know». Секрет в LLM не попадает — **блокировка**.
 
 > Retrieval-данные (score/source/malicious) выше — проверены на собранном `index_security/`.
-> Текст ответа LLM зависит от запущенной модели (`llama3.2:3b`); полные stdout-логи прогона
-> нужно снять в среде с Ollama (см. §5) и сохранить, напр. в `solutions/logs/security_demo.txt`.
+> Полные stdout-логи реального прогона (INSECURE→утечка «swordfish», SECURE→блок) сохранены в
+> [`solutions/logs/security_demo.txt`](logs/security_demo.txt).
 
 ---
 
@@ -206,6 +206,8 @@ I don't know — the knowledge base contains no supporting evidence for this que
 *Relevance guard: тема не представлена в базе знаний Astral Strife.*
 
 **Итог: 10/10 тестов успешны** — 5 полезных ответов, 5 корректных отказов.
+
+> Реальный захваченный вывод этой батареи — [`solutions/logs/security_demo.txt`](logs/security_demo.txt).
 
 ---
 
