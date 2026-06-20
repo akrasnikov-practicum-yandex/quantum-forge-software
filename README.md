@@ -20,7 +20,7 @@ scripts/
   rag_bot.py                RAG-бот: few-shot + CoT + 3 слоя защиты, REPL/--demo
   security.py               детектор и санитайзер prompt-injection
   security_demo.py          демонстрация INSECURE vs SECURE + батарея 10 тестов
-solutions/           отчёты по заданиям 1–5 + REVIEW-sprint7.md
+solutions/           отчёты по заданиям 1–5
   logs/              реальные логи прогона Задания 5 (security_demo + rag_bot --demo)
 Project_template.md  сводные ответы по всем заданиям
 ```
