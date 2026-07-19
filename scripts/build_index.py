@@ -93,6 +93,19 @@ def main() -> int:
     # --- CLI-аргументы -------------------------------------------------------
     parser = argparse.ArgumentParser(description="Построение FAISS-индекса базы знаний")
     parser.add_argument(
+        "--kb-dir",
+        type=Path,
+        default=KB_DIR,
+        help=f"Каталог с .md-документами базы знаний (default: {KB_DIR})",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=EMBEDDING_MODEL,
+        help=f"Embedding-модель (default: {EMBEDDING_MODEL}); для не-английских корпусов "
+             "используйте мультиязычную, напр. sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    )
+    parser.add_argument(
         "--extra-dir",
         type=Path,
         default=None,
@@ -106,6 +119,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     out_dir: Path = args.out if args.out.is_absolute() else ROOT / args.out
+    kb_dir: Path = args.kb_dir if args.kb_dir.is_absolute() else ROOT / args.kb_dir
 
     # Отложенный импорт — пакеты могут отсутствовать при первой проверке кода
     try:
@@ -122,13 +136,13 @@ def main() -> int:
         return 1
 
     # --- 1. Чтение документов -----------------------------------------------
-    md_files = sorted(KB_DIR.glob("*.md"))
+    md_files = sorted(kb_dir.glob("*.md"))
     if args.extra_dir:
         extra_path = args.extra_dir if args.extra_dir.is_absolute() else ROOT / args.extra_dir
         md_files = md_files + sorted(extra_path.glob("*.md"))
         print(f"[INFO] Включаю доп. каталог: {extra_path} ({len(sorted(extra_path.glob('*.md')))} файлов)")
     if not md_files:
-        print(f"[ERROR] В {KB_DIR} нет .md-файлов.", file=sys.stderr)
+        print(f"[ERROR] В {kb_dir} нет .md-файлов.", file=sys.stderr)
         return 1
 
     splitter = RecursiveCharacterTextSplitter(
@@ -175,9 +189,10 @@ def main() -> int:
     print(f"[INFO] Документов: {len(md_files)}, чанков: {total_chunks}")
 
     # --- 2. Генерация эмбеддингов и построение индекса ----------------------
-    print(f"[INFO] Загружаю embedding-модель: {EMBEDDING_MODEL}")
+    model_name: str = args.model
+    print(f"[INFO] Загружаю embedding-модель: {model_name}")
     embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
+        model_name=model_name,
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},  # нормализация → L2-ранжирование ≈ cosine
     )
@@ -195,7 +210,7 @@ def main() -> int:
 
     # --- 4. build_report.json -----------------------------------------------
     report = {
-        "model": EMBEDDING_MODEL,
+        "model": model_name,
         "embedding_dim": int(vectorstore.index.d),  # из реального индекса, не хардкод
         "chunk_size": CHUNK_SIZE,
         "chunk_overlap": CHUNK_OVERLAP,
@@ -203,7 +218,7 @@ def main() -> int:
         "num_chunks": total_chunks,
         "elapsed_seconds": round(elapsed, 3),
         "built_at": datetime.now(timezone.utc).isoformat(),
-        "knowledge_base": str(KB_DIR.relative_to(ROOT)),
+        "knowledge_base": str(kb_dir.relative_to(ROOT) if kb_dir.is_relative_to(ROOT) else kb_dir),
         "extra_dir": (str(args.extra_dir) if args.extra_dir else None),
         "index_path": str(out_dir.relative_to(ROOT) if out_dir.is_relative_to(ROOT) else out_dir),
     }

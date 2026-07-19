@@ -44,6 +44,8 @@ python scripts/rag_bot.py --demo     # демо-запросы
 python scripts/security_demo.py      # демонстрация защиты от prompt-injection
 ```
 
+> Как подготовить и загрузить **новую базу знаний / индекс** — [docs/LOAD_DATABASE.md](docs/LOAD_DATABASE.md).
+
 ## Запуск в Docker
 
 ```bash

@@ -81,6 +81,11 @@ def main() -> int:
         "--index", type=Path, default=INDEX_DIR,
         help=f"Каталог FAISS-индекса (default: {INDEX_DIR}); напр. index_security",
     )
+    parser.add_argument(
+        "--model", type=str, default=EMBEDDING_MODEL,
+        help=f"Embedding-модель (default: {EMBEDDING_MODEL}); должна совпадать с моделью, "
+             "которой строился индекс (см. build_report.json в каталоге индекса)",
+    )
     args = parser.parse_args()
     index_path = args.index if args.index.is_absolute() else ROOT / args.index
 
@@ -105,9 +110,9 @@ def main() -> int:
         return 1
 
     # Загрузка embedding-модели и индекса
-    print(f"[INFO] Загружаю модель: {EMBEDDING_MODEL}")
+    print(f"[INFO] Загружаю модель: {args.model}")
     embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
+        model_name=args.model,
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},
     )
