@@ -216,7 +216,7 @@ def ask(query: str, vectorstore, llm, defense: bool = True) -> None:
         else:
             lc_messages.append(HumanMessage(content=m["content"]))
 
-    response = llm.invoke(lc_messages, options={
+    base_options = {
         "temperature": 0,
         # Без stop-последовательности маленькие модели копируют формат few-shot
         # примеров и генерируют новые "Q: ... A: ..." пары вместо остановки после ответа.
@@ -225,8 +225,17 @@ def ask(query: str, vectorstore, llm, defense: bool = True) -> None:
         # весь файл модели в системную RAM перед копированием в VRAM — из-за этого
         # gemma4 (~9 ГиБ) не грузилась при нехватке RAM, хотя VRAM хватало с запасом.
         "use_mmap": True,
-        "num_gpu": 999,
-    })
+    }
+    try:
+        # num_gpu=999 форсирует полный оффлоад на GPU (нужно для части моделей —
+        # см. gemma4 выше). Некоторые архитектуры (MoE: qwen35moe, gpt-oss) отвергают
+        # любое явное значение num_gpu ошибкой "memory layout cannot be allocated" —
+        # для них нужно доверять авто-подбору Ollama (без num_gpu).
+        response = llm.invoke(lc_messages, options={**base_options, "num_gpu": 999})
+    except Exception as exc:
+        if "memory layout cannot be allocated" not in str(exc):
+            raise
+        response = llm.invoke(lc_messages, options=base_options)
     answer = response.content if hasattr(response, "content") else str(response)
 
     # Шаг 6: Вывод
