@@ -216,7 +216,17 @@ def ask(query: str, vectorstore, llm, defense: bool = True) -> None:
         else:
             lc_messages.append(HumanMessage(content=m["content"]))
 
-    response = llm.invoke(lc_messages)
+    response = llm.invoke(lc_messages, options={
+        "temperature": 0,
+        # Без stop-последовательности маленькие модели копируют формат few-shot
+        # примеров и генерируют новые "Q: ... A: ..." пары вместо остановки после ответа.
+        "stop": ["\nQ:", "\n\nQ:"],
+        # use_mmap=false (дефолт Ollama при частичном GPU-оффлоаде) заставляет читать
+        # весь файл модели в системную RAM перед копированием в VRAM — из-за этого
+        # gemma4 (~9 ГиБ) не грузилась при нехватке RAM, хотя VRAM хватало с запасом.
+        "use_mmap": True,
+        "num_gpu": 999,
+    })
     answer = response.content if hasattr(response, "content") else str(response)
 
     # Шаг 6: Вывод
@@ -310,7 +320,6 @@ def main() -> int:
     llm = ChatOllama(
         model=OLLAMA_MODEL,
         base_url=OLLAMA_BASE_URL,
-        temperature=0,
     )
 
     defense_label = "SECURE (defense ON)" if defense else "⚠️  INSECURE (defense OFF)"
