@@ -1,0 +1,112 @@
+[INFO] Loading embedding model: sentence-transformers/all-MiniLM-L6-v2
+[INFO] Loading FAISS index: C:\project\practicum.yandex\quantum-forge-software\index
+[INFO] Connecting to Ollama: http://localhost:11434, model=llama3.2:3b
+
+════════════════════════════════════════════════════════════════
+  DEMO MODE — Astral Strife Knowledge Base RAG Bot
+════════════════════════════════════════════════════════════════
+  Model: llama3.2:3b | Threshold: 1.3
+  Mode: SECURE (defense ON)
+  Index: C:\project\practicum.yandex\quantum-forge-software\index
+════════════════════════════════════════════════════════════════
+
+── IN-DOMAIN QUERIES (bot should answer) ──
+
+
+════════════════════════════════════════════════════════════════
+  Q: Who is Xarn Velgor and what is his origin?
+════════════════════════════════════════════════════════════════
+
+Step 1: The question asks for information on Xarn Velgor's identity and origin.
+Step 2: According to document [1], Xarn Velgor was originally born as Anbar Skyrend, a gifted pilot and powerful user of the Synth Flux. He was trained as a Kethan by Oben-Var Renoth and later manipulated by Overlord Malkor into becoming the Drakkar Sovereign Xarn Velgor.
+Step 3: Xarn Velgor's origin is tied to his transformation from Anbar Skyrend, who was trained by Oben-Var Renoth and eventually became a powerful user of the Synth Flux after being influenced by Overlord Malkor.
+Answer: Xarn Velgor was originally born as Anbar Skyrend, a gifted pilot and powerful user of the Synth Flux. He was manipulated into becoming the Drakkar Sovereign Xarn Velgor by Overlord Malkor [1].
+
+📚 Sources:
+  [1] Xarn Velgor — knowledge_base/xarn-velgor.md
+  [2] Oben-Var Renoth — knowledge_base/oben-var-renoth.md
+  [3] Drakkar — knowledge_base/drakkar.md
+  [4] Joran Skyrend — knowledge_base/joran-skyrend.md
+
+
+════════════════════════════════════════════════════════════════
+  Q: What is the Synth Flux and how do the Veyari use it?
+════════════════════════════════════════════════════════════════
+
+Step 1: The question asks about the nature of the Synth Flux and its application by the Veyari Conclave.
+Step 2: According to documents [1] and [2], the Synth Flux is a mysterious energy field that binds the Expanse together, granting practitioners heightened intuition, telekinesis, influence over weaker minds, and a deep connection to the living universe. The Veyari Conclave follows the Lumen Tide of the Synth Flux, emphasizing peace, discipline, knowledge, and selflessness.
+Step 3: The Veyari use the Synth Flux for protection and service, drawing on its energy to maintain the Aurelian Concord and uphold their ideals of compassion and self-discipline.
+Answer: The Synth Flux is a mysterious energy field that binds the Expanse together; the Veyari Conclave uses it to promote peace, discipline, knowledge, and selflessness [1], [2].
+
+📚 Sources:
+  [1] The Synth Flux — knowledge_base/the-synth-flux.md
+  [2] Veyari Conclave — knowledge_base/veyari-conclave.md
+  [3] Joran Skyrend — knowledge_base/joran-skyrend.md
+  [4] Reson crystal — knowledge_base/reson-crystal.md
+
+
+════════════════════════════════════════════════════════════════
+  Q: Describe the Void Core and its purpose.
+════════════════════════════════════════════════════════════════
+
+Step 1: The question asks about the description of the Void Core and its purpose.
+Step 2: According to document [1], the Void Core was a colossal space station and superweapon constructed by the Helion Dominion, designed to project Dominion power across the Expanse through fear and overwhelming firepower.
+Step 3: The Void Core served as both a mobile battle platform and a symbol of the Dominion's dominance over the Synod and the star systems of the Outer Reach.
+Answer: The Void Core was a colossal space station and superweapon constructed by the Helion Dominion, serving as a mobile battle platform and a symbol of their dominance.
+
+📚 Sources:
+  [1] Void Core — knowledge_base/void-core.md
+  [2] Arc-glaive — knowledge_base/arc-glaive.md
+  [3] Kestrel-X — knowledge_base/kestrel-x.md
+  [4] Reson crystal — knowledge_base/reson-crystal.md
+
+
+════════════════════════════════════════════════════════════════
+  Q: What is the role of the Ember Coalition in the Astral Strife?
+════════════════════════════════════════════════════════════════
+
+Step 1: The question asks about the role of the Ember Coalition in the Astral Strife.
+Step 2: According to documents [1], [3] and [4], the Ember Coalition was a coalition of worlds, soldiers, and sympathizers united in armed resistance against the Helion Dominion. Its primary goal was to overthrow Dominion tyranny and restore the values of the former Aurelian Concord.
+Step 3: The Ember Coalition played a key role as an organized resistance force against the Helion Dominion, conducting daring operations, and eventually weakening Dominion control through perseverance and sacrifice.
+Answer: The Ember Coalition served as a unified resistance force against the Helion Dominion in the Astral Strife Expanse.
+
+📚 Sources:
+  [1] Ember Coalition — knowledge_base/ember-coalition.md
+  [2] Mira Auros — knowledge_base/mira-auros.md
+  [3] Helion Dominion — knowledge_base/helion-dominion.md
+  [4] Glaciax — knowledge_base/glaciax.md
+
+
+════════════════════════════════════════════════════════════════
+  Q: What planet served as the capital of the Helion Dominion?
+════════════════════════════════════════════════════════════════
+
+Step 1: The question asks about the planet that served as the capital of the Helion Dominion.
+Step 2: According to document [3] Lyressa, Centra Prime became the capital of the Helion Dominion following sweeping political upheaval, including the events of the Vat Wars and the transformation of the Concord.
+Step 3: The planet that served as the capital of the Helion Dominion is Centra Prime.
+Answer: Centra Prime served as the capital of the Helion Dominion [1].
+
+📚 Sources:
+  [1] Centra Prime — knowledge_base/centra-prime.md
+  [2] Helion Dominion — knowledge_base/helion-dominion.md
+  [3] Lyressa — knowledge_base/lyressa.md
+  [4] Aurelian Concord — knowledge_base/aurelian-concord.md
+
+
+── OUT-OF-DOMAIN QUERIES (bot should say 'I don't know') ──
+
+
+════════════════════════════════════════════════════════════════
+  Q: What is the capital of France?
+════════════════════════════════════════════════════════════════
+
+I don't know — the knowledge base contains no supporting evidence for this question.
+
+
+════════════════════════════════════════════════════════════════
+  Q: Who invented the telephone?
+════════════════════════════════════════════════════════════════
+
+I don't know — the knowledge base contains no supporting evidence for this question.
+
+[OK] Demo complete.

@@ -1,0 +1,29 @@
+# Запуск RAG-бота (бот + FAISS) вместе с локальной LLM (Ollama).
+# FAISS-индекс встроен в образ бота (in-process), Ollama — отдельный сервис.
+#
+#   docker compose build
+#   docker compose up -d ollama
+#   docker compose exec ollama ollama pull llama3.2:3b   # один раз: загрузить модель
+#   docker compose run --rm bot                          # прогон демо-запросов
+#   docker compose run --rm bot python scripts/rag_bot.py   # интерактивный REPL
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  bot:
+    build: .
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.2:3b
+    stdin_open: true
+    tty: true
+
+volumes:
+  ollama_models:
